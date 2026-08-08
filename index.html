@@ -4,6 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>머니그로우 — 투자 계산기 & 기록</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" type="image/png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="theme-color" content="#2f6fed" />
 <style>
   :root {
     --bg: #f5f6f8;
@@ -21,7 +25,7 @@
     --radius: 14px;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #14161c;
       --surface: #1c1f28;
       --surface-2: #232733;
@@ -30,6 +34,15 @@
       --text-muted: #9aa0b0;
       --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.35);
     }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161c;
+    --surface: #1c1f28;
+    --surface-2: #232733;
+    --border: #2c3140;
+    --text: #eceef2;
+    --text-muted: #9aa0b0;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.35);
   }
   * { box-sizing: border-box; }
   body {
@@ -135,16 +148,36 @@
   .inline-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .status-msg { font-size: 12px; color: var(--safe); margin-left: 4px; }
   .credit { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+  .header-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom: 12px; }
+  .header-top .brand { margin-bottom: 0; }
+  .auth-box { text-align: right; }
+  .auth-box #userBox { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
+  .auth-box #userEmail { font-size: 12px; color: var(--text-muted); }
+  .auth-box .hint { font-size: 11px; color: var(--text-muted); margin: 4px 0 0; max-width: 220px; }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="brand">
-    <div class="logo"></div>
-    <div>
-      <h1>머니그로우</h1>
-      <p>복리 계산 · 자산배분 · 투자기록을 한 곳에서</p>
+  <div class="header-top">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>머니그로우</h1>
+        <p>복리 계산 · 자산배분 · 투자기록을 한 곳에서</p>
+      </div>
+    </div>
+    <div class="auth-box">
+      <form id="signInForm" class="inline-actions" style="justify-content:flex-end;">
+        <input type="email" id="signInEmail" placeholder="이메일" required style="width:150px; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); font-size:13px;">
+        <button class="btn secondary" type="submit" id="signInBtn">로그인 링크 받기</button>
+      </form>
+      <div id="userBox" style="display:none;">
+        <span id="userEmail"></span>
+        <span class="pill" id="syncStatus"></span>
+        <button class="btn secondary" id="signOutBtn">로그아웃</button>
+      </div>
+      <p class="hint">기기 간 자동 동기화는 GitHub Pages 배포 + Supabase 설정 완료 후 동작해요</p>
     </div>
   </div>
   <nav id="tabs">
@@ -393,6 +426,13 @@
   const pct = n => (Math.round(n*10)/10) + '%';
   const palette = ['#2f6fed', '#14b8a6', '#d99a1b', '#e0533d', '#8b5cf6', '#6b7080'];
 
+  // ---------- Cross-device sync hook (wired up by sync.js when Firebase is configured) ----------
+  let suppressChangeEvent = false;
+  function notifyDataChanged() {
+    if (suppressChangeEvent) return;
+    window.dispatchEvent(new CustomEvent('moneygrow:datachanged'));
+  }
+
   function drawPie(svgEl, legendEl, data /* [{label, value}] */) {
     svgEl.innerHTML = '';
     legendEl.innerHTML = '';
@@ -590,6 +630,7 @@
     const msg = document.getElementById('allocSaveMsg');
     msg.textContent = '저장됐어요. 대시보드에서 확인하세요.';
     setTimeout(() => { msg.textContent = ''; }, 3000);
+    notifyDataChanged();
   });
 
   // ---------- Investment tracker ----------
@@ -632,6 +673,7 @@
         saveHoldings(list2);
         renderTracker();
         renderDashboard();
+        notifyDataChanged();
       });
     });
 
@@ -727,6 +769,7 @@
         saveHoldings(list);
         renderTracker();
         renderDashboard();
+        notifyDataChanged();
         alert(`${added}건을 불러왔어요.`);
       } catch(err) {
         alert('CSV 파일을 읽는 중 오류가 발생했어요.');
@@ -758,6 +801,7 @@
     document.getElementById('trCurrent').value = '';
     renderTracker();
     renderDashboard();
+    notifyDataChanged();
   });
 
   // ---------- Net worth snapshots ----------
@@ -799,6 +843,7 @@
     if (!amount || amount <= 0 || !date) { alert('목표 금액과 날짜를 입력해주세요.'); return; }
     saveGoal({ amount, date, rate });
     renderDashboard();
+    notifyDataChanged();
   });
 
   function renderGoal(currentTotal) {
@@ -879,11 +924,37 @@
     const data = Object.keys(byType).map(k => ({label:k, value:byType[k]}));
     drawPie(document.getElementById('dashPie'), document.getElementById('dashLegend'), data);
 
-    if (list.length) recordSnapshot(totalCurrent);
+    if (list.length) { recordSnapshot(totalCurrent); notifyDataChanged(); }
     renderNetWorthChart();
     renderGoal(totalCurrent);
     renderRebalance(byType, totalCurrent);
   }
+
+  // ---------- Cross-device sync bridge (used by sync.js) ----------
+  window.MoneyGrow = {
+    getAllData: () => ({
+      holdings: loadHoldings(),
+      targetAlloc: loadTargetAlloc() || currentAlloc,
+      goal: loadGoal(),
+      snapshots: loadSnapshots(),
+    }),
+    setAllData: (data) => {
+      suppressChangeEvent = true;
+      if (data.holdings) saveHoldings(data.holdings);
+      if (data.targetAlloc && data.targetAlloc.length) {
+        saveTargetAlloc(data.targetAlloc);
+        currentAlloc = JSON.parse(JSON.stringify(data.targetAlloc));
+      }
+      if (data.goal) saveGoal(data.goal);
+      if (data.snapshots) saveSnapshots(data.snapshots);
+      renderSliders();
+      renderAllocChart();
+      syncProfileTabActive();
+      renderTracker();
+      renderDashboard();
+      suppressChangeEvent = false;
+    },
+  };
 
   // ---------- init ----------
   document.getElementById('trDate').value = new Date().toISOString().slice(0,10);
@@ -894,6 +965,16 @@
   renderDashboard();
   runCalc();
 })();
+</script>
+<script type="module" src="sync.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {
+        // file://로 열었거나 오프라인 설치를 지원하지 않는 환경 — 무시하고 일반 웹앱으로 계속 사용
+      });
+    });
+  }
 </script>
 </body>
 </html>
