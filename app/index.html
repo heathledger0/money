@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>머니그로우 — 투자 계산기 & 기록</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-2: #f0f1f4;
+    --border: #e2e4e9;
+    --text: #1a1d24;
+    --text-muted: #6b7080;
+    --accent: #2f6fed;
+    --accent-2: #14b8a6;
+    --danger: #e0533d;
+    --warn: #d99a1b;
+    --safe: #2f9e6f;
+    --shadow: 0 1px 2px rgba(20,22,30,0.04), 0 4px 16px rgba(20,22,30,0.06);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161c;
+      --surface: #1c1f28;
+      --surface-2: #232733;
+      --border: #2c3140;
+      --text: #eceef2;
+      --text-muted: #9aa0b0;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Apple SD Gothic Neo", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+  }
+  .brand { display:flex; align-items:center; gap:10px; margin-bottom: 12px; }
+  .brand .logo { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+  .brand h1 { font-size: 17px; margin: 0; }
+  .brand p { font-size: 12px; color: var(--text-muted); margin: 0; }
+  nav { display:flex; gap: 6px; flex-wrap: wrap; }
+  nav button {
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  nav button.active { background: var(--accent); border-color: var(--accent); color: white; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 20px 80px; }
+  section { display: none; }
+  section.active { display: block; animation: fade .2s ease; }
+  @keyframes fade { from { opacity:0; transform: translateY(4px);} to {opacity:1; transform:none;} }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+  }
+  .card h2 { margin: 0 0 4px; font-size: 16px; }
+  .card .sub { color: var(--text-muted); font-size: 13px; margin: 0 0 16px; }
+  .grid { display: grid; gap: 14px; }
+  .grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .field label { display:block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; }
+  .field input, .field select {
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 14px;
+  }
+  .btn {
+    display:inline-block;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 9px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .btn.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  .btn.danger { background: var(--danger); }
+  .stat-row { display:flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; }
+  .stat { flex: 1; min-width: 140px; background: var(--surface-2); border-radius: 10px; padding: 12px 14px; }
+  .stat .k { font-size: 11px; color: var(--text-muted); }
+  .stat .v { font-size: 19px; font-weight: 700; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+  .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: var(--surface-2); }
+  .gain { color: var(--safe); } .loss { color: var(--danger); }
+  .legend { display:flex; flex-wrap:wrap; gap: 10px; margin-top: 12px; font-size: 12px; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:10px; height:10px; border-radius:3px; display:inline-block; }
+  .chart-wrap { display:flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+  .disclaimer { font-size: 12px; color: var(--text-muted); background: var(--surface-2); border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+  ul.guide { padding-left: 18px; }
+  ul.guide li { margin-bottom: 6px; font-size: 14px; }
+  .slider-row { display:flex; align-items:center; gap:10px; margin-bottom: 10px; }
+  .slider-row label { flex: 0 0 130px; font-size: 13px; }
+  .slider-row input[type=range] { flex:1; }
+  .slider-row .val { flex: 0 0 44px; text-align:right; font-size: 13px; font-weight:600; }
+  .profile-tabs { display:flex; gap:8px; margin-bottom: 14px; }
+  .profile-tabs button { flex:1; padding: 10px; border-radius: 9px; border:1px solid var(--border); background: var(--surface-2); color: var(--text); cursor:pointer; font-size:13px; }
+  .profile-tabs button.active { border-color: var(--accent); background: rgba(47,111,237,0.12); font-weight:700; }
+  .src-list { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+  .src-list a { color: var(--accent); }
+  .empty { color: var(--text-muted); font-size: 13px; padding: 16px 0; text-align:center; }
+  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo"></div>
+    <div>
+      <h1>머니그로우</h1>
+      <p>복리 계산 · 자산배분 · 투자기록을 한 곳에서</p>
+    </div>
+  </div>
+  <nav id="tabs">
+    <button data-tab="dashboard" class="active">대시보드</button>
+    <button data-tab="calculator">복리 계산기</button>
+    <button data-tab="allocator">포트폴리오 배분</button>
+    <button data-tab="tracker">투자 기록</button>
+    <button data-tab="guide">학습 가이드</button>
+    <button data-tab="market">시장 정보</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="active">
+    <div class="card">
+      <h2>내 포트폴리오 요약</h2>
+      <p class="sub">투자 기록 탭에서 입력한 데이터를 기준으로 자동 집계됩니다.</p>
+      <div class="stat-row" id="dashStats"></div>
+      <div class="chart-wrap" style="margin-top:18px;">
+        <svg id="dashPie" width="180" height="180" viewBox="0 0 180 180"></svg>
+        <div class="legend" id="dashLegend"></div>
+      </div>
+      <div class="empty" id="dashEmpty" style="display:none;">아직 투자 기록이 없어요. '투자 기록' 탭에서 자산을 추가해보세요.</div>
+    </div>
+    <div class="card">
+      <h2>빠른 시작</h2>
+      <p class="sub">처음이라면 이 순서를 추천해요.</p>
+      <ul class="guide">
+        <li><b>1. 학습 가이드</b>에서 분산투자·적립식투자·복리 개념을 5분만 훑어보세요.</li>
+        <li><b>2. 포트폴리오 배분</b> 탭에서 내 투자 성향에 맞는 목표 비중을 정하세요.</li>
+        <li><b>3. 복리 계산기</b>로 매달 얼마씩, 몇 년을 넣으면 목표 금액에 도달하는지 시뮬레이션하세요.</li>
+        <li><b>4. 투자 기록</b> 탭에 실제 매수 내역을 입력하고 목표 비중과 비교하며 관리하세요.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- CALCULATOR -->
+  <section id="calculator">
+    <div class="card">
+      <h2>복리 계산기</h2>
+      <p class="sub">초기 투자금과 매달 적립금이 연 수익률로 불어나는 과정을 시뮬레이션합니다. (세전 · 명목 수익률 기준)</p>
+      <div class="grid cols-2">
+        <div class="field"><label>초기 투자금 (원)</label><input type="number" id="calcPrincipal" value="5000000" min="0" step="100000"></div>
+        <div class="field"><label>매달 적립금 (원)</label><input type="number" id="calcMonthly" value="500000" min="0" step="10000"></div>
+        <div class="field"><label>연 예상 수익률 (%)</label><input type="number" id="calcRate" value="7" min="-50" max="100" step="0.1"></div>
+        <div class="field"><label>투자 기간 (년)</label><input type="number" id="calcYears" value="10" min="1" max="60" step="1"></div>
+      </div>
+      <div style="margin-top:14px;"><button class="btn" id="calcRun">계산하기</button></div>
+      <div class="stat-row" id="calcStats"></div>
+      <svg id="calcChart" width="100%" height="220" viewBox="0 0 640 220" preserveAspectRatio="none" style="margin-top:16px; width:100%; height:220px;"></svg>
+      <div class="disclaimer">수익률은 입력값에 따른 단순 시뮬레이션이며 실제 수익을 보장하지 않습니다. 세금·수수료는 반영되지 않았습니다.</div>
+    </div>
+  </section>
+
+  <!-- ALLOCATOR -->
+  <section id="allocator">
+    <div class="card">
+      <h2>포트폴리오 배분 (예시)</h2>
+      <p class="sub">투자 성향별 예시 비중입니다. 슬라이더로 직접 조정할 수 있어요. (참고용 · 투자 자문 아님)</p>
+      <div class="profile-tabs" id="profileTabs">
+        <button data-profile="stable">안정형</button>
+        <button data-profile="balanced" class="active">중립형</button>
+        <button data-profile="aggressive">공격형</button>
+      </div>
+      <div id="sliders"></div>
+      <div class="chart-wrap" style="margin-top:10px;">
+        <svg id="allocPie" width="180" height="180" viewBox="0 0 180 180"></svg>
+        <div class="legend" id="allocLegend"></div>
+      </div>
+      <div class="disclaimer" id="allocSumWarn"></div>
+      <div class="disclaimer">
+        예시 상품군: 국내주식(코스피200 추종 ETF: KODEX 200, TIGER 코스피 등) · 미국주식/ETF(VOO, QQQM, SCHD 등) · 채권/예금(안전자산) · 암호화폐(BTC, ETH 등, 변동성 매우 높음). 특정 종목 매수 추천이 아니며, 실제 투자 전 스스로 리서치하고 본인 책임 하에 결정하세요.
+      </div>
+    </div>
+  </section>
+
+  <!-- TRACKER -->
+  <section id="tracker">
+    <div class="card">
+      <h2>투자 기록 추가</h2>
+      <p class="sub">보유 자산을 입력하면 브라우저에 안전하게 저장됩니다 (서버 전송 없음, 이 기기에만 저장).</p>
+      <div class="grid cols-2">
+        <div class="field"><label>자산명</label><input type="text" id="trAsset" placeholder="예: KODEX 200, VOO, 비트코인"></div>
+        <div class="field"><label>유형</label>
+          <select id="trType">
+            <option value="국내주식/ETF">국내주식/ETF</option>
+            <option value="미국주식/ETF">미국주식/ETF</option>
+            <option value="암호화폐">암호화폐</option>
+            <option value="채권/예금">채권/예금</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="field"><label>매수 금액 (원)</label><input type="number" id="trAmount" min="0" step="10000"></div>
+        <div class="field"><label>현재 평가금액 (원, 선택)</label><input type="number" id="trCurrent" min="0" step="10000"></div>
+        <div class="field"><label>매수일</label><input type="date" id="trDate"></div>
+      </div>
+      <div style="margin-top:14px;"><button class="btn" id="trAdd">추가하기</button></div>
+    </div>
+    <div class="card">
+      <h2>보유 내역</h2>
+      <div class="stat-row" id="trStats"></div>
+      <table id="trTable" style="margin-top:14px;">
+        <thead><tr><th>자산명</th><th>유형</th><th>매수금액</th><th>평가금액</th><th>손익</th><th>매수일</th><th></th></tr></thead>
+        <tbody id="trBody"></tbody>
+      </table>
+      <div class="empty" id="trEmpty" style="display:none;">아직 등록된 자산이 없어요.</div>
+    </div>
+  </section>
+
+  <!-- GUIDE -->
+  <section id="guide">
+    <div class="card">
+      <h2>투자 핵심 개념 5가지</h2>
+      <ul class="guide">
+        <li><b>분산투자</b> — 한 자산에 몰빵하지 않고 국가·자산군·업종을 나눠 담으면 특정 자산의 큰 하락이 전체 자산에 주는 충격을 줄일 수 있습니다.</li>
+        <li><b>적립식 투자 (DCA, Dollar-Cost Averaging)</b> — 매달 일정 금액을 꾸준히 매수하면 매수 단가가 평균화되어, 한 번에 목돈을 넣는 것보다 타이밍 리스크가 줄어듭니다.</li>
+        <li><b>복리 효과</b> — 원금뿐 아니라 그동안 쌓인 수익에도 다시 수익이 붙는 구조입니다. 기간이 길어질수록 효과가 기하급수적으로 커지므로, 투자 기간(시간)이 가장 강력한 무기입니다.</li>
+        <li><b>리밸런싱</b> — 시간이 지나며 자산 비중이 목표에서 벗어나면(예: 주식이 많이 올라 비중 과다) 정기적으로 원래 목표 비중으로 되돌리는 작업입니다. 보통 6개월~1년 주기를 많이 씁니다.</li>
+        <li><b>세금/비용 감안</b> — 국내 상장 해외 ETF는 배당·매매차익에 배당소득세(15.4%)가, 해외 직접투자(해외상장 ETF·주식)는 연 250만원 공제 후 양도소득세(22%)가 적용되는 등 상품별로 세금 체계가 다릅니다. ISA·연금저축·IRP 등 절세 계좌 활용을 검토해볼 만합니다. (세율·제도는 변경될 수 있으니 실제 투자 전 최신 세법을 확인하세요.)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>흔한 실수</h2>
+      <ul class="guide">
+        <li>단기 급등 소식만 보고 뒤늦게 추격 매수하기</li>
+        <li>생활비·비상금까지 투자에 넣어 유동성 위기 자초하기</li>
+        <li>하락장에 패닉셀 후 반등장을 놓치기</li>
+        <li>수수료·세금을 고려하지 않고 수익률만 비교하기</li>
+        <li>레버리지·인버스 상품을 장기 보유하기 (변동성 끌림 효과로 장기 성과가 지수와 크게 어긋날 수 있음)</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- MARKET -->
+  <section id="market">
+    <div class="card">
+      <h2>시장 정보 참고 자료</h2>
+      <p class="sub">2026년 8월 8일 기준 웹 검색으로 정리한 참고용 정보입니다. 실시간 시세가 아니며 투자 추천이 아닙니다. 실제 매수 전 증권사 앱/공식 사이트에서 최신 정보를 다시 확인하세요.</p>
+
+      <h3 style="font-size:14px; margin-bottom:6px;">미국 대표 ETF</h3>
+      <table>
+        <thead><tr><th>티커</th><th>추종지수/전략</th><th>특징</th></tr></thead>
+        <tbody>
+          <tr><td>VOO</td><td>S&P500</td><td>Vanguard 운용, 운용보수 0.03%로 초저비용, 2026년 8월 기준 순자산 1조달러 이상 세계 최대 ETF급</td></tr>
+          <tr><td>QQQM</td><td>나스닥100</td><td>QQQ의 저비용 버전, 최근 10년 연평균 약 15.8% (S&P500 약 14%)</td></tr>
+          <tr><td>SCHD</td><td>고배당 100</td><td>Schwab 운용, 배당수익률 약 3.3%, 운용보수 0.06%</td></tr>
+          <tr><td>VYM</td><td>고배당</td><td>Vanguard 운용, 운용보수 0.04%</td></tr>
+          <tr><td>JEPI / JEPQ</td><td>커버드콜(S&P500/나스닥100)</td><td>월배당형, 고배당이지만 상승장 수익 일부 제한</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size:14px; margin: 16px 0 6px;">국내 대표 인덱스 ETF</h3>
+      <table>
+        <thead><tr><th>상품명</th><th>추종지수</th><th>특징</th></tr></thead>
+        <tbody>
+          <tr><td>KODEX 200</td><td>코스피200</td><td>삼성자산운용, 국내 최대 규모 ETF 중 하나 (순자산 약 20조원대)</td></tr>
+          <tr><td>TIGER 코스피</td><td>코스피</td><td>미래에셋자산운용</td></tr>
+          <tr><td>RISE 200</td><td>코스피200</td><td>초저보수(연 0.017%) 경쟁 상품</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size:14px; margin: 16px 0 6px;">암호화폐</h3>
+      <p style="font-size:13px;">2026년 7월 말 기준 이더리움(ETH)은 약 1,898달러, 시가총액 약 2,291억 달러 수준으로 조사됐습니다. 비트코인은 검색에서 정확한 실시간 수치를 얻지 못했으니 매수 전 거래소 앱에서 직접 확인하세요. 암호화폐는 하루에도 두 자릿수 % 변동이 흔한 고위험 자산군으로, 전체 자산의 일부만 배분하는 것이 일반적입니다.</p>
+
+      <div class="disclaimer">이 정보는 특정 시점의 웹 검색 스니펫을 요약한 것으로 부정확하거나 오래되었을 수 있습니다. 투자 조언이 아니라 리서치 출발점으로만 활용하세요.</div>
+      <div class="src-list">
+        출처: <a href="https://www.fool.com/investing/how-to-invest/etfs/etfs-to-buy/" target="_blank" rel="noopener">Motley Fool - Best ETFs 2026</a> ·
+        <a href="https://www.morningstar.com/funds/3-top-us-etfs-2026-beyond-2" target="_blank" rel="noopener">Morningstar</a> ·
+        <a href="https://etfmap.kr/guide/korea" target="_blank" rel="noopener">ETFmap 국내 ETF 가이드</a> ·
+        <a href="https://www.samsungfund.com/etf/product/view.do?id=2ETF01" target="_blank" rel="noopener">삼성자산운용 KODEX 200</a> ·
+        <a href="https://www.coingecko.com/en/coins/ethereum" target="_blank" rel="noopener">CoinGecko - Ethereum</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(function(){
+  // ---------- Tab navigation ----------
+  const tabs = document.querySelectorAll('#tabs button');
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    tabs.forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('main > section').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'dashboard') renderDashboard();
+  }));
+
+  const fmt = n => Math.round(n).toLocaleString('ko-KR') + '원';
+  const pct = n => (Math.round(n*10)/10) + '%';
+  const palette = ['#2f6fed', '#14b8a6', '#d99a1b', '#e0533d', '#8b5cf6', '#6b7080'];
+
+  function drawPie(svgEl, legendEl, data /* [{label, value}] */) {
+    svgEl.innerHTML = '';
+    legendEl.innerHTML = '';
+    const total = data.reduce((s,d) => s + d.value, 0);
+    const cx = 90, cy = 90, r = 80;
+    if (total <= 0) {
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', r);
+      c.setAttribute('fill', 'var(--surface-2)');
+      svgEl.appendChild(c);
+      return;
+    }
+    let angle = -Math.PI/2;
+    data.forEach((d, i) => {
+      const frac = d.value / total;
+      const next = angle + frac * Math.PI * 2;
+      const x1 = cx + r*Math.cos(angle), y1 = cy + r*Math.sin(angle);
+      const x2 = cx + r*Math.cos(next), y2 = cy + r*Math.sin(next);
+      const large = frac > 0.5 ? 1 : 0;
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      const dPath = frac >= 0.9999
+        ? `M ${cx} ${cy-r} A ${r} ${r} 0 1 1 ${cx-0.01} ${cy-r} Z`
+        : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+      path.setAttribute('d', dPath);
+      path.setAttribute('fill', palette[i % palette.length]);
+      svgEl.appendChild(path);
+      angle = next;
+
+      const item = document.createElement('span');
+      item.innerHTML = `<span class="dot" style="background:${palette[i % palette.length]}"></span>${d.label} · ${pct(frac*100)}`;
+      legendEl.appendChild(item);
+    });
+  }
+
+  function drawLine(svgEl, series /* array of numbers */, labels) {
+    svgEl.innerHTML = '';
+    const W = 640, H = 220, padL = 60, padB = 26, padT = 12, padR = 12;
+    const max = Math.max(...series, 1);
+    const min = 0;
+    const stepX = (W - padL - padR) / (series.length - 1 || 1);
+    const scaleY = v => H - padB - ( (v - min) / (max - min || 1) ) * (H - padT - padB);
+
+    // grid + y labels
+    for (let g = 0; g <= 4; g++) {
+      const val = max * g / 4;
+      const y = scaleY(val);
+      const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1', padL); line.setAttribute('x2', W-padR);
+      line.setAttribute('y1', y); line.setAttribute('y2', y);
+      line.setAttribute('stroke', 'var(--border)'); line.setAttribute('stroke-width', '1');
+      svgEl.appendChild(line);
+      const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x', 4); t.setAttribute('y', y+4); t.setAttribute('font-size','10');
+      t.setAttribute('fill', 'var(--text-muted)');
+      t.textContent = (val >= 100000000) ? (val/100000000).toFixed(1)+'억' : (val/10000).toFixed(0)+'만';
+      svgEl.appendChild(t);
+    }
+
+    let pts = series.map((v,i) => `${padL + i*stepX},${scaleY(v)}`).join(' ');
+    const poly = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+    poly.setAttribute('points', pts);
+    poly.setAttribute('fill', 'none');
+    poly.setAttribute('stroke', 'var(--accent)');
+    poly.setAttribute('stroke-width', '2.5');
+    svgEl.appendChild(poly);
+
+    // area fill
+    const area = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    area.setAttribute('points', `${padL},${scaleY(0)} ${pts} ${padL+(series.length-1)*stepX},${scaleY(0)}`);
+    area.setAttribute('fill', 'var(--accent)');
+    area.setAttribute('opacity', '0.08');
+    svgEl.insertBefore(area, poly);
+
+    // x labels (start / mid / end)
+    [0, Math.floor((series.length-1)/2), series.length-1].forEach(i => {
+      const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x', padL + i*stepX); t.setAttribute('y', H-6);
+      t.setAttribute('font-size','10'); t.setAttribute('fill','var(--text-muted)');
+      t.setAttribute('text-anchor', i===0 ? 'start' : (i===series.length-1 ? 'end' : 'middle'));
+      t.textContent = labels[i];
+      svgEl.appendChild(t);
+    });
+  }
+
+  // ---------- Compound calculator ----------
+  function runCalc() {
+    const principal = parseFloat(document.getElementById('calcPrincipal').value) || 0;
+    const monthly = parseFloat(document.getElementById('calcMonthly').value) || 0;
+    const annualRate = parseFloat(document.getElementById('calcRate').value) || 0;
+    const years = parseInt(document.getElementById('calcYears').value) || 1;
+    const monthlyRate = annualRate / 100 / 12;
+    const months = years * 12;
+
+    let balance = principal;
+    const series = [balance];
+    for (let m = 1; m <= months; m++) {
+      balance = balance * (1 + monthlyRate) + monthly;
+      if (m % 12 === 0) series.push(balance);
+    }
+    if (series.length === 1) series.push(balance);
+
+    const totalContrib = principal + monthly * months;
+    const totalGain = balance - totalContrib;
+
+    document.getElementById('calcStats').innerHTML = `
+      <div class="stat"><div class="k">최종 평가금액</div><div class="v">${fmt(balance)}</div></div>
+      <div class="stat"><div class="k">총 납입원금</div><div class="v">${fmt(totalContrib)}</div></div>
+      <div class="stat"><div class="k">투자 수익</div><div class="v ${totalGain>=0?'gain':'loss'}">${totalGain>=0?'+':''}${fmt(totalGain)}</div></div>
+    `;
+    const labels = series.map((_,i) => i===0 ? '시작' : `${i}년`);
+    drawLine(document.getElementById('calcChart'), series, labels);
+  }
+  document.getElementById('calcRun').addEventListener('click', runCalc);
+
+  // ---------- Portfolio allocator ----------
+  const profiles = {
+    stable: [
+      {label:'채권/예금', value:55},
+      {label:'국내주식/ETF', value:15},
+      {label:'미국주식/ETF', value:25},
+      {label:'암호화폐', value:5},
+    ],
+    balanced: [
+      {label:'채권/예금', value:25},
+      {label:'국내주식/ETF', value:20},
+      {label:'미국주식/ETF', value:40},
+      {label:'암호화폐', value:15},
+    ],
+    aggressive: [
+      {label:'채권/예금', value:5},
+      {label:'국내주식/ETF', value:20},
+      {label:'미국주식/ETF', value:45},
+      {label:'암호화폐', value:30},
+    ],
+  };
+  let currentAlloc = JSON.parse(JSON.stringify(profiles.balanced));
+
+  function renderSliders() {
+    const wrap = document.getElementById('sliders');
+    wrap.innerHTML = '';
+    currentAlloc.forEach((item, i) => {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      row.innerHTML = `
+        <label>${item.label}</label>
+        <input type="range" min="0" max="100" value="${item.value}" data-i="${i}">
+        <span class="val">${item.value}%</span>
+      `;
+      wrap.appendChild(row);
+      row.querySelector('input').addEventListener('input', (e) => {
+        currentAlloc[i].value = parseInt(e.target.value);
+        row.querySelector('.val').textContent = currentAlloc[i].value + '%';
+        renderAllocChart();
+      });
+    });
+  }
+
+  function renderAllocChart() {
+    drawPie(document.getElementById('allocPie'), document.getElementById('allocLegend'), currentAlloc);
+    const sum = currentAlloc.reduce((s,d) => s + d.value, 0);
+    const warnEl = document.getElementById('allocSumWarn');
+    warnEl.textContent = sum === 100 ? `합계 ${sum}% — 정상입니다.` : `합계 ${sum}% — 100%가 되도록 조정해보세요 (참고용이라 필수는 아니에요).`;
+  }
+
+  document.querySelectorAll('#profileTabs button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#profileTabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentAlloc = JSON.parse(JSON.stringify(profiles[btn.dataset.profile]));
+      renderSliders();
+      renderAllocChart();
+    });
+  });
+
+  // ---------- Investment tracker ----------
+  const STORAGE_KEY = 'moneygrow_holdings_v1';
+  function loadHoldings() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch(e) { return []; }
+  }
+  function saveHoldings(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+
+  function renderTracker() {
+    const list = loadHoldings();
+    const body = document.getElementById('trBody');
+    body.innerHTML = '';
+    document.getElementById('trEmpty').style.display = list.length ? 'none' : 'block';
+
+    let totalInvested = 0, totalCurrent = 0;
+    list.forEach(h => {
+      const cur = (h.current !== null && h.current !== undefined && h.current !== '') ? Number(h.current) : Number(h.amount);
+      totalInvested += Number(h.amount);
+      totalCurrent += cur;
+      const gain = cur - Number(h.amount);
+      const gainPct = h.amount > 0 ? (gain / h.amount * 100) : 0;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(h.asset)}</td>
+        <td><span class="pill">${escapeHtml(h.type)}</span></td>
+        <td>${fmt(h.amount)}</td>
+        <td>${fmt(cur)}</td>
+        <td class="${gain>=0?'gain':'loss'}">${gain>=0?'+':''}${fmt(gain)} (${gain>=0?'+':''}${pct(gainPct)})</td>
+        <td>${h.date || '-'}</td>
+        <td><button class="btn secondary" data-id="${h.id}">삭제</button></td>
+      `;
+      body.appendChild(tr);
+    });
+
+    body.querySelectorAll('button[data-id]').forEach(b => {
+      b.addEventListener('click', () => {
+        const list2 = loadHoldings().filter(h => String(h.id) !== b.dataset.id);
+        saveHoldings(list2);
+        renderTracker();
+        renderDashboard();
+      });
+    });
+
+    const totalGain = totalCurrent - totalInvested;
+    document.getElementById('trStats').innerHTML = `
+      <div class="stat"><div class="k">총 투자원금</div><div class="v">${fmt(totalInvested)}</div></div>
+      <div class="stat"><div class="k">총 평가금액</div><div class="v">${fmt(totalCurrent)}</div></div>
+      <div class="stat"><div class="k">총 손익</div><div class="v ${totalGain>=0?'gain':'loss'}">${totalGain>=0?'+':''}${fmt(totalGain)}</div></div>
+    `;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  document.getElementById('trAdd').addEventListener('click', () => {
+    const asset = document.getElementById('trAsset').value.trim();
+    const type = document.getElementById('trType').value;
+    const amount = parseFloat(document.getElementById('trAmount').value);
+    const current = document.getElementById('trCurrent').value;
+    const date = document.getElementById('trDate').value;
+    if (!asset || !amount || amount <= 0) {
+      alert('자산명과 매수 금액을 올바르게 입력해주세요.');
+      return;
+    }
+    const list = loadHoldings();
+    list.push({ id: Date.now(), asset, type, amount, current: current === '' ? null : parseFloat(current), date });
+    saveHoldings(list);
+    document.getElementById('trAsset').value = '';
+    document.getElementById('trAmount').value = '';
+    document.getElementById('trCurrent').value = '';
+    renderTracker();
+    renderDashboard();
+  });
+
+  // ---------- Dashboard ----------
+  function renderDashboard() {
+    const list = loadHoldings();
+    document.getElementById('dashEmpty').style.display = list.length ? 'none' : 'block';
+    let totalInvested = 0, totalCurrent = 0;
+    const byType = {};
+    list.forEach(h => {
+      const cur = (h.current !== null && h.current !== undefined && h.current !== '') ? Number(h.current) : Number(h.amount);
+      totalInvested += Number(h.amount);
+      totalCurrent += cur;
+      byType[h.type] = (byType[h.type] || 0) + cur;
+    });
+    const totalGain = totalCurrent - totalInvested;
+    const gainPct = totalInvested > 0 ? (totalGain/totalInvested*100) : 0;
+    document.getElementById('dashStats').innerHTML = `
+      <div class="stat"><div class="k">총 평가금액</div><div class="v">${fmt(totalCurrent)}</div></div>
+      <div class="stat"><div class="k">총 투자원금</div><div class="v">${fmt(totalInvested)}</div></div>
+      <div class="stat"><div class="k">수익률</div><div class="v ${totalGain>=0?'gain':'loss'}">${totalGain>=0?'+':''}${pct(gainPct)}</div></div>
+    `;
+    const data = Object.keys(byType).map(k => ({label:k, value:byType[k]}));
+    drawPie(document.getElementById('dashPie'), document.getElementById('dashLegend'), data);
+  }
+
+  // ---------- init ----------
+  document.getElementById('trDate').value = new Date().toISOString().slice(0,10);
+  renderSliders();
+  renderAllocChart();
+  renderTracker();
+  renderDashboard();
+  runCalc();
+})();
+</script>
+</body>
+</html>
