@@ -9,8 +9,8 @@
 // 이 값들은 비밀키가 아니라 "이 앱이 어떤 Supabase 프로젝트를 쓰는지" 알려주는 공개 식별자입니다.
 // 실제 데이터 보호는 Row Level Security(행 단위 보안) 정책 + 로그인으로 이루어집니다.
 
-export const supabaseUrl = "https://YOUR_PROJECT_REF.supabase.co";
-export const supabaseAnonKey = "YOUR_ANON_PUBLIC_KEY";
+export const supabaseUrl = "https://arxuhdehydbbmvptbklp.supabase.co";
+export const supabaseAnonKey = "sb_publishable_jnFrL1ePzRNrm3HctFHZmA_D_iIUval";
 
 export const isSupabaseConfigured =
   supabaseUrl !== "https://YOUR_PROJECT_REF.supabase.co" && supabaseAnonKey !== "YOUR_ANON_PUBLIC_KEY";
