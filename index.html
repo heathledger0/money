@@ -290,6 +290,14 @@
   <!-- TRACKER -->
   <section id="tracker">
     <div class="card">
+      <h2>환율 설정</h2>
+      <p class="sub">달러 표시 자산(해외주식 등)의 환차익을 계산하는 데 쓰여요. 실시간 시세 연동이 아니라서 직접 주기적으로 업데이트해주세요.</p>
+      <div class="grid cols-2">
+        <div class="field"><label>현재 환율 (원/달러)</label><input type="number" id="fxRateInput" min="0" step="1"></div>
+      </div>
+      <div style="margin-top:12px;"><button class="btn secondary" id="fxRateSave">환율 저장</button> <span class="status-msg" id="fxRateSaveMsg"></span></div>
+    </div>
+    <div class="card">
       <h2>투자 기록 추가</h2>
       <p class="sub">보유 자산을 입력하면 브라우저에 안전하게 저장됩니다 (서버 전송 없음, 이 기기에만 저장).</p>
       <div class="grid cols-2">
@@ -306,7 +314,9 @@
         <div class="field"><label>매수 금액 (원)</label><input type="number" id="trAmount" min="0" step="10000"></div>
         <div class="field"><label>현재 평가금액 (원, 선택)</label><input type="number" id="trCurrent" min="0" step="10000"></div>
         <div class="field"><label>매수일</label><input type="date" id="trDate"></div>
+        <div class="field"><label>매수 시 환율 (원/달러, 달러 자산인 경우만)</label><input type="number" id="trFxRate" min="0" step="0.01" placeholder="예: 1380"></div>
       </div>
+      <p class="sub" style="margin-top:8px;">환전으로 산 달러든 해외주식을 팔아서 생긴 달러든 상관없이, 이 종목을 매수한 시점의 원/달러 환율만 입력하면 환차익이 자동 계산돼요.</p>
       <div style="margin-top:14px;"><button class="btn" id="trAdd">추가하기</button></div>
     </div>
     <div class="card">
@@ -322,7 +332,7 @@
       <div class="stat-row" id="trStats"></div>
       <div id="trConcentration"></div>
       <table id="trTable" style="margin-top:14px;">
-        <thead><tr><th>자산명</th><th>유형</th><th>매수금액</th><th>평가금액</th><th>손익</th><th>매수일</th><th></th></tr></thead>
+        <thead><tr><th>자산명</th><th>유형</th><th>매수금액</th><th>평가금액</th><th>손익</th><th>환차익</th><th>매수일</th><th></th></tr></thead>
         <tbody id="trBody"></tbody>
       </table>
       <div class="empty" id="trEmpty" style="display:none;">아직 등록된 자산이 없어요.</div>
@@ -641,19 +651,52 @@
   }
   function saveHoldings(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
 
+  // ---------- FX rate (for 환차익 계산) ----------
+  const FX_RATE_KEY = 'moneygrow_fxrate_v1';
+  function loadFxRate() {
+    const v = parseFloat(localStorage.getItem(FX_RATE_KEY));
+    return (v && v > 0) ? v : null;
+  }
+  function saveFxRate(rate) { localStorage.setItem(FX_RATE_KEY, String(rate)); }
+
+  // 매수 시 환율(h.fxRate)이 기록된 종목만 환차익을 분리해서 계산.
+  // 환전으로 산 달러든 해외주식 매도로 생긴 달러든 진입 환율만 있으면 계산 가능.
+  function calcFxGain(h, currentFxRate) {
+    if (!h.fxRate || !currentFxRate) return null;
+    const cur = (h.current !== null && h.current !== undefined && h.current !== '') ? Number(h.current) : Number(h.amount);
+    const investedUSD = Number(h.amount) / h.fxRate;
+    return investedUSD * (currentFxRate - h.fxRate);
+  }
+
+  document.getElementById('fxRateSave').addEventListener('click', () => {
+    const rate = parseFloat(document.getElementById('fxRateInput').value);
+    if (!rate || rate <= 0) { alert('현재 환율을 올바르게 입력해주세요.'); return; }
+    saveFxRate(rate);
+    const msg = document.getElementById('fxRateSaveMsg');
+    msg.textContent = '저장됐어요.';
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+    renderTracker();
+    renderDashboard();
+    notifyDataChanged();
+  });
+
   function renderTracker() {
     const list = loadHoldings();
     const body = document.getElementById('trBody');
     body.innerHTML = '';
     document.getElementById('trEmpty').style.display = list.length ? 'none' : 'block';
+    const currentFxRate = loadFxRate();
 
-    let totalInvested = 0, totalCurrent = 0;
+    let totalInvested = 0, totalCurrent = 0, totalFxGain = 0;
     list.forEach(h => {
       const cur = (h.current !== null && h.current !== undefined && h.current !== '') ? Number(h.current) : Number(h.amount);
       totalInvested += Number(h.amount);
       totalCurrent += cur;
       const gain = cur - Number(h.amount);
       const gainPct = h.amount > 0 ? (gain / h.amount * 100) : 0;
+      const fxGain = calcFxGain(h, currentFxRate);
+      if (fxGain !== null) totalFxGain += fxGain;
+      const fxCell = fxGain === null ? '-' : `<span class="${fxGain>=0?'gain':'loss'}">${fxGain>=0?'+':''}${fmt(fxGain)}</span>`;
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(h.asset)}</td>
@@ -661,6 +704,7 @@
         <td>${fmt(h.amount)}</td>
         <td>${fmt(cur)}</td>
         <td class="${gain>=0?'gain':'loss'}">${gain>=0?'+':''}${fmt(gain)} (${gain>=0?'+':''}${pct(gainPct)})</td>
+        <td>${fxCell}</td>
         <td>${h.date || '-'}</td>
         <td><button class="btn secondary" data-id="${h.id}">삭제</button></td>
       `;
@@ -678,10 +722,12 @@
     });
 
     const totalGain = totalCurrent - totalInvested;
+    const hasFx = list.some(h => h.fxRate && currentFxRate);
     document.getElementById('trStats').innerHTML = `
       <div class="stat"><div class="k">총 투자원금</div><div class="v">${fmt(totalInvested)}</div></div>
       <div class="stat"><div class="k">총 평가금액</div><div class="v">${fmt(totalCurrent)}</div></div>
       <div class="stat"><div class="k">총 손익</div><div class="v ${totalGain>=0?'gain':'loss'}">${totalGain>=0?'+':''}${fmt(totalGain)}</div></div>
+      ${hasFx ? `<div class="stat"><div class="k">총 환차익</div><div class="v ${totalFxGain>=0?'gain':'loss'}">${totalFxGain>=0?'+':''}${fmt(totalFxGain)}</div></div>` : ''}
     `;
     renderConcentrationWarning(list, totalCurrent);
   }
@@ -699,9 +745,9 @@
   }
 
   function toCSV(list) {
-    const header = ['asset','type','amount','current','date'];
+    const header = ['asset','type','amount','current','date','fxRate'];
     const esc = v => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
-    const lines = [header.join(',')].concat(list.map(h => [h.asset, h.type, h.amount, h.current, h.date].map(esc).join(',')));
+    const lines = [header.join(',')].concat(list.map(h => [h.asset, h.type, h.amount, h.current, h.date, h.fxRate].map(esc).join(',')));
     return lines.join('\n');
   }
 
@@ -755,14 +801,15 @@
         const list = loadHoldings();
         let added = 0;
         rows.forEach((f, idx) => {
-          const [asset, type, amount, current, date] = f;
+          const [asset, type, amount, current, date, fxRate] = f;
           if (!asset || !amount) return;
           list.push({
             id: Date.now() + idx,
             asset, type: type || '기타',
             amount: parseFloat(amount),
             current: current ? parseFloat(current) : null,
-            date: date || ''
+            date: date || '',
+            fxRate: fxRate ? parseFloat(fxRate) : null
           });
           added++;
         });
@@ -789,16 +836,18 @@
     const amount = parseFloat(document.getElementById('trAmount').value);
     const current = document.getElementById('trCurrent').value;
     const date = document.getElementById('trDate').value;
+    const fxRate = document.getElementById('trFxRate').value;
     if (!asset || !amount || amount <= 0) {
       alert('자산명과 매수 금액을 올바르게 입력해주세요.');
       return;
     }
     const list = loadHoldings();
-    list.push({ id: Date.now(), asset, type, amount, current: current === '' ? null : parseFloat(current), date });
+    list.push({ id: Date.now(), asset, type, amount, current: current === '' ? null : parseFloat(current), date, fxRate: fxRate === '' ? null : parseFloat(fxRate) });
     saveHoldings(list);
     document.getElementById('trAsset').value = '';
     document.getElementById('trAmount').value = '';
     document.getElementById('trCurrent').value = '';
+    document.getElementById('trFxRate').value = '';
     renderTracker();
     renderDashboard();
     notifyDataChanged();
@@ -906,20 +955,25 @@
   function renderDashboard() {
     const list = loadHoldings();
     document.getElementById('dashEmpty').style.display = list.length ? 'none' : 'block';
-    let totalInvested = 0, totalCurrent = 0;
+    const currentFxRate = loadFxRate();
+    let totalInvested = 0, totalCurrent = 0, totalFxGain = 0;
     const byType = {};
     list.forEach(h => {
       const cur = (h.current !== null && h.current !== undefined && h.current !== '') ? Number(h.current) : Number(h.amount);
       totalInvested += Number(h.amount);
       totalCurrent += cur;
       byType[h.type] = (byType[h.type] || 0) + cur;
+      const fxGain = calcFxGain(h, currentFxRate);
+      if (fxGain !== null) totalFxGain += fxGain;
     });
     const totalGain = totalCurrent - totalInvested;
     const gainPct = totalInvested > 0 ? (totalGain/totalInvested*100) : 0;
+    const hasFx = list.some(h => h.fxRate && currentFxRate);
     document.getElementById('dashStats').innerHTML = `
       <div class="stat"><div class="k">총 평가금액</div><div class="v">${fmt(totalCurrent)}</div></div>
       <div class="stat"><div class="k">총 투자원금</div><div class="v">${fmt(totalInvested)}</div></div>
       <div class="stat"><div class="k">수익률</div><div class="v ${totalGain>=0?'gain':'loss'}">${totalGain>=0?'+':''}${pct(gainPct)}</div></div>
+      ${hasFx ? `<div class="stat"><div class="k">환차익 (달러자산)</div><div class="v ${totalFxGain>=0?'gain':'loss'}">${totalFxGain>=0?'+':''}${fmt(totalFxGain)}</div></div>` : ''}
     `;
     const data = Object.keys(byType).map(k => ({label:k, value:byType[k]}));
     drawPie(document.getElementById('dashPie'), document.getElementById('dashLegend'), data);
@@ -937,6 +991,7 @@
       targetAlloc: loadTargetAlloc() || currentAlloc,
       goal: loadGoal(),
       snapshots: loadSnapshots(),
+      fxRate: loadFxRate(),
     }),
     setAllData: (data) => {
       suppressChangeEvent = true;
@@ -947,6 +1002,10 @@
       }
       if (data.goal) saveGoal(data.goal);
       if (data.snapshots) saveSnapshots(data.snapshots);
+      if (data.fxRate) {
+        saveFxRate(data.fxRate);
+        document.getElementById('fxRateInput').value = data.fxRate;
+      }
       renderSliders();
       renderAllocChart();
       syncProfileTabActive();
@@ -958,6 +1017,7 @@
 
   // ---------- init ----------
   document.getElementById('trDate').value = new Date().toISOString().slice(0,10);
+  if (loadFxRate()) document.getElementById('fxRateInput').value = loadFxRate();
   renderSliders();
   renderAllocChart();
   syncProfileTabActive();
